@@ -2,47 +2,38 @@
 
 ## 📌 Project Overview
 
-This project implements a **Multi-Agent Reinforcement Learning (MARL)** system using the **PettingZoo `simple_spread_v3`** environment. It demonstrates **independent learning**, **agent coordination**, **specialization**, and **robustness** under agent failure and non-stationarity.
-
-The task is designed to meet the full requirements of a real-world MARL system design and analysis, including reward tracking, convergence analysis, and policy behavior evaluation.
+This project implements a **Multi-Agent Reinforcement Learning (MARL)** system using the **PettingZoo `simple_spread_v3`** environment. It demonstrates **independent learning**, **agent coordination**, **specialization**, and **robustness** under agent failure and non-stationarity. The system is designed to meet the requirements of a real-world MARL system design and analysis, including reward tracking, convergence analysis, and policy behavior evaluation.
 
 ---
 
-## 🎯 Objectives
+## 🎯 Objectives & Features
 
-- Implement a MARL system where **3 agents** learn to coordinate to cover **3 landmarks**.
-- Use the **IQL (Independent Q-Learning)** algorithm with a **DQN-based agent**.
-- Handle **non-stationary environments**, simulate **agent failures**, and introduce **specialization** via observation masking.
-- Evaluate learning curves and agent robustness using quantitative metrics.
+- **3 agents** learn to coordinate to cover **3 landmarks** in a cooperative setting.
+- Implements **Independent Q-Learning (IQL)** with DQN-based agents.
+- Handles **non-stationary environments** using target networks, experience replay, and fingerprinting.
+- Simulates **agent failures** and introduces **specialization** via observation masking.
+- Supports **inter-agent communication** via message fields in agent observations.
+- Logs and visualizes learning curves and agent performance.
 
 ---
 
----
+## 🧪 Key Components & Implementation
 
-## 🧪 Features Implemented (with Code Snippets)
-
-### ✅ 1. Multi-Agent Learning (IQL)
-Each agent learns independently using its own DQN.
+### 1. Multi-Agent Learning (IQL)
+Each agent learns independently using its own DQN. The environment is PettingZoo's `simple_spread_v3`.
 
 ```python
 # agent initialization
 for agent_name in env.agents:
-    agents[agent_name] = DQNAgent(obs_shape, action_n)
+    agents[agent_name] = DQNAgent(obs_shape, action_n, shared_buffer)
 ```
 
-```python
-# agent experience collection
-agents[agent].remember(last_obs[agent], action, reward, obs, done)
-```
-
----
-
-### ✅ 2. Centralized Training with Decentralized Execution (CTDE)
-All agents are trained in a loop, but make decisions based only on their local observations.
+### 2. Centralized Training with Decentralized Execution (CTDE)
+Agents act based on local observations, but training is performed in a centralized loop. Each agent's experience is stored in a **shared replay buffer**.
 
 ```python
 # decentralized action selection
-action = agents[agent].act(obs, epsilon)
+action = agents[agent].act(obs, epsilon, message, fingerprint)
 
 # centralized training loop
 for ag in agents.values():
@@ -50,70 +41,32 @@ for ag in agents.values():
     ag.update_target()
 ```
 
----
+### 3. Coordination & Communication
+- **Shared Rewards**: Agents are rewarded based on the team's performance.
+- **Message Passing**: Each agent's observation is augmented with a `message` field, allowing for simple inter-agent communication (can be extended for learned protocols).
 
-### ✅ 3. Coordination via Shared Rewards and Common Goal
-All agents interact in the shared `simple_spread_v3` world where success depends on **cooperation** (covering separate landmarks).
-
-```python
-# agents are trained independently, but rewards reflect shared environment
-avg_reward = np.mean(list(total_rewards.values()))
-```
-
----
-
-### ✅ 4. Specialization – Masked Observations
-Agent 0 receives a partial observation to simulate limited sensing capability.
+### 4. Specialization & Diversity
+- **Observation Masking**: Agent 0 receives a partial observation to simulate limited sensing capability, encouraging specialization.
 
 ```python
 def modify_obs(agent, obs):
     if agent == "agent_0":
         obs = obs[:obs_shape // 2]  # mask half of the observation
     return obs
-
-# usage in training
-obs = modify_obs(agent, obs)
 ```
 
----
+### 5. Non-Stationarity Handling
+- **Experience Replay**: Uses a shared replay buffer for stability.
+- **Fingerprinting**: Each experience includes a fingerprint to help agents disambiguate non-stationary policies of others.
+- **Target Networks**: Used to stabilize Q-learning.
 
-### ✅ 5. Non-Stationarity Handling
-Agents are trained simultaneously; learning is stabilized with target networks and experience replay.
+### 6. Robustness & Failure Modes
+- **Agent Failure Simulation**: Agent 1 randomly fails to act during training, simulating dropout or malfunction.
+- **Effect Logging**: The impact of failures is reflected in the reward logs and plots.
 
-```python
-# Epsilon decay controls exploration in a non-stationary setting
-epsilon = max(min_epsilon, epsilon * epsilon_decay)
-
-# Target network for stabilizing Q-learning
-ag.update_target()
-```
-
----
-
-### ✅ 6. Agent Failure Simulation
-Agent 1 randomly fails to act during training.
-
-```python
-if agent == "agent_1" and random.random() < 0.1:
-    action = 0  # simulate failure with default action
-```
-
----
-
-### ✅ 7. Visualization and Logging
-Rewards are logged and plotted. Optional video recording supported.
-
-```python
-# Logging average episode reward
-rewards_log.append(avg_reward)
-
-# Plotting after training
-plt.plot(rewards_log)
-plt.title("Average Episode Reward")
-plt.xlabel("Episode")
-plt.ylabel("Reward")
-plt.savefig("plots/average_rewards.png")
-```
+### 7. Visualization and Logging
+- **Reward Logging**: Average episode rewards are logged and plotted.
+- **Video Recording**: Optionally record agent behavior for qualitative analysis.
 
 ---
 
@@ -123,7 +76,8 @@ plt.savefig("plots/average_rewards.png")
 python main.py
 ```
 
-Trains 3 agents for 500 episodes and logs rewards. A plot is saved in `plots/average_rewards.png`.
+- Trains 3 agents for 500 episodes
+- Logs and plots average reward curve in `plots/average_rewards.png`
 
 ---
 
@@ -133,7 +87,7 @@ Trains 3 agents for 500 episodes and logs rewards. A plot is saved in `plots/ave
 python record_episode.py
 ```
 
-This saves a visual `agent_behavior.mp4` using PettingZoo's `"rgb_array"` rendering.
+- Outputs a video file `agent_behavior.mp4` showing agents in one full episode
 
 ---
 
@@ -142,9 +96,11 @@ This saves a visual `agent_behavior.mp4` using PettingZoo's `"rgb_array"` render
 ```
 marl_project/
 ├── agents/
-│   └── dqn_agent.py          # DQNAgent class for IQL
+│   ├── dqn_agent.py          # DQNAgent class for IQL, message/fingerprint support
+│   ├── critic.py             # Centralized critic (for future extensions)
+│   └── shared_replay_buffer.py # Shared replay buffer for CTDE
 ├── main.py                   # Training script with coordination, failure, specialization
-├── record_episode.py         # record one episode as a video
+├── record_episode.py         # Record one episode as a video
 ├── plots/
 │   └── average_rewards.png   # Output reward plot
 └── README.md                 # This file
@@ -160,9 +116,9 @@ marl_project/
 - NumPy
 - Matplotlib
 - PyTorch
-- OpenCV 
+- OpenCV
 
-### ✅ Install Requirements
+### Install Requirements
 
 ```bash
 pip install pettingzoo[mpe] supersuit torch numpy matplotlib opencv-python
@@ -170,25 +126,23 @@ pip install pettingzoo[mpe] supersuit torch numpy matplotlib opencv-python
 
 ---
 
-## 🚀 How to Run Training
+## 📖 Usage Guide & Customization
 
-### ▶️ Run the main training script
+### Basic Training
+- Run `python main.py` to start training with default settings (3 agents, 500 episodes).
+- Reward plot is saved to `plots/average_rewards.png`.
 
-```bash
-python main.py
-```
+### Recording Agent Behavior
+- Run `python record_episode.py` to save a video of a single episode.
 
-- Trains 3 agents for 500 episodes
-- Plots and saves average reward curve in `plots/average_rewards.png`
+### Customizing Agents & Environment
+- **Change number of agents/landmarks**: Edit the environment initialization in `main.py`.
+- **Modify agent specialization**: Adjust the `modify_obs` function for different observation masks.
+- **Tune hyperparameters**: Change learning rate, batch size, or epsilon decay in `main.py` or `dqn_agent.py`.
+- **Enable/disable agent failure**: Comment/uncomment the failure simulation code in `main.py`.
+- **Extend communication**: Modify the `message` field logic in `dqn_agent.py` for more complex protocols.
 
-### 🎥 Optional: Record Agent Behavior
-
-```bash
-python record_episode.py
-```
-
-- Outputs a video file `agent_behavior.mp4` showing agents in one full episode
-
+---
 
 ## 📈 Results Snapshot
 
@@ -203,22 +157,23 @@ Reward improves initially, fluctuates due to agent failures and policy shifts, b
 
 ---
 
-## 🧠 Key Design Decisions
+## 🧠 Analysis: Agent Behaviors & Failure Recovery
 
-- **IQL** was chosen for simplicity and baseline performance
-- **PettingZoo** offers clean agent-environment interaction
-- **Coordination** emerges from shared reward and environment dynamics
-- **Failure Simulation** shows agent dropout and robustness testing
-- **Specialization** created via partial observability (`agent_0`)
+- **Coordination**: Agents learn to spread out and cover landmarks, as seen in improved average rewards.
+- **Specialization**: Agent 0, with limited observation, often takes a distinct role or lags in performance, demonstrating emergent specialization.
+- **Failure Handling**: When Agent 1 fails, the team reward drops, but the system continues training, showing some robustness. No explicit recovery/fail-safe is implemented, but the shared reward structure encourages remaining agents to adapt.
+- **Communication**: The `message` field is available for inter-agent signaling, but is currently used as a placeholder. This can be extended for learned or hard-coded protocols.
 
 ---
 
+
+
+
 ## 📂 Deliverables
 
-- ✅ **Source Code**: Modular implementation with clean separation
-- ✅ **Plot**: `plots/average_rewards.png`
-- ✅ **Optional Video**: `agent_behavior.mp4`
-- ✅ **Presentation**: (Use reward plot + behavior video + code walkthrough)
+- **Source Code**: Modular implementation with clean separation
+- **Plot**: `plots/average_rewards.png`
+- **Optional Video**: `agent_behavior.mp4`
 
 ---
 
