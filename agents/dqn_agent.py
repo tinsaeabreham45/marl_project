@@ -1,5 +1,3 @@
-# agents/dqn_agent.py
-
 import numpy as np
 import random
 import torch
@@ -19,7 +17,7 @@ class QNetwork(nn.Module):
         return self.fc(x)
 
 class DQNAgent:
-    def __init__(self, obs_size, action_size, shared_buffer, lr=1e-3, gamma=0.99):
+    def __init__(self, obs_size, action_size, shared_buffer, lr=1e-4, gamma=0.99):
         self.q_net = QNetwork(obs_size, action_size)
         self.target_net = QNetwork(obs_size, action_size)
         self.target_net.load_state_dict(self.q_net.state_dict())
@@ -57,10 +55,15 @@ class DQNAgent:
         next_messages = torch.zeros_like(messages)
         next_fingerprints = torch.zeros_like(fingerprints)
         next_states_with_msg_fp = torch.cat([next_states, next_messages, next_fingerprints], dim=1)
-        q_values = self.q_net(states_with_msg_fp).gather(1, actions)
-        next_q_values = self.target_net(next_states_with_msg_fp).max(1, keepdim=True)[0]
+
+        # DDQN: Use primary network to select action, target network to evaluate
+        with torch.no_grad():
+            next_actions = self.q_net(next_states_with_msg_fp).argmax(dim=1, keepdim=True)
+            next_q_values = self.target_net(next_states_with_msg_fp).gather(1, next_actions)
         target = rewards + self.gamma * next_q_values * (1 - dones)
+        q_values = self.q_net(states_with_msg_fp).gather(1, actions)
         loss = self.criterion(q_values, target.detach())
+
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
